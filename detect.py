@@ -1,11 +1,13 @@
 import os          #New
 import argparse
 import time
+import requests
 from pathlib import Path
 
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
+import pymysql.cursors
 from numpy import random
 
 from models.experimental import attempt_load
@@ -15,8 +17,19 @@ from utils.general import check_img_size, non_max_suppression, apply_classifier,
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
+# Connect to the database
+#connection = pymysql.connect(
+#    host='167.86.127.10',
+#    user='deepgaz_root',
+#    password='iEjySCEs6Rjz',
+#    db='deepgaz_db',
+#    charset='utf8mb4',
+#    port = 3306,
+#    cursorclass=pymysql.cursors.DictCursor
+#)
+
 originalRoute = False
-newRoute = "C://Users//SANTABROS//Desktop//deepGaze3//YoloV5//data//predictions//"
+newRoute = "/usr/src/app/data/predictions/"
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
@@ -131,8 +144,14 @@ def detect(save_img=False):
                         if save_txt:  # Write to file
                             xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                             line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
-                            with open(txt_path + '.txt', 'a') as f:
-                                f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                            #with open(txt_path + '.txt', 'a') as f:
+                            #    f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                            with open(newRoute + "etiquetas/" + txt_path.split("/")[-1] + '.txt', 'a') as f:
+                                f.write(str(names[int(cls)]) + " " + (str(conf).split("tensor(")[-1]).replace(")","")  + '\n')
+                                resp = requests.post( 'https://deepgaze.xyz/api/images/store-data', headers = {'Content-Type': 'application/json', 'Accept': 'application/json'}, data = '{"name": "'+ str(names[int(cls)]) +'", "porcent":"'+ (str(conf).split("tensor(")[-1]).replace(")","") +'", "nameImg": "'+ save_path.split("/")[-1] +'"}' )
+                                print(resp.status_code)
+                                print(resp.text)
+
     
                         if save_img or view_img:  # Add bbox to image
                             label = '%s %.2f' % (names[int(cls)], conf)
@@ -157,7 +176,7 @@ def detect(save_img=False):
                             #print("---------------------")
                             cv2.imwrite(save_path, im0)
                         else:                        
-                            cv2.imwrite(newRoute + save_path.split("\\")[-1], im0)
+                            cv2.imwrite(newRoute + "yolo_" +save_path.split("/")[-1], im0)
                     else:
                         if vid_path != save_path:  # new video
                             vid_path = save_path
